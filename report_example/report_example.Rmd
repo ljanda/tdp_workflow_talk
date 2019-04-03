@@ -1,0 +1,159 @@
+---
+title: "Diamond Report Example"
+output: html_document
+editor_options: 
+  chunk_output_type: console
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = FALSE, message = FALSE, warning = FALSE)
+```
+
+`r emo::ji("gem")` `r emo::ji("gem")` `r emo::ji("gem")` `r emo::ji("gem")` 
+`r emo::ji("gem")` `r emo::ji("gem")` `r emo::ji("gem")` `r emo::ji("gem")`
+`r emo::ji("gem")` `r emo::ji("gem")` `r emo::ji("gem")` `r emo::ji("gem")`
+`r emo::ji("gem")` `r emo::ji("gem")` `r emo::ji("gem")` `r emo::ji("gem")`
+`r emo::ji("gem")` `r emo::ji("gem")` `r emo::ji("gem")` `r emo::ji("gem")`
+`r emo::ji("gem")` `r emo::ji("gem")` `r emo::ji("gem")` `r emo::ji("gem")`
+
+
+# {.tabset}
+
+
+
+```{r libraries, echo=FALSE}
+library(tidyverse)    # take all that is good about this universe
+library(knitr)        # knit your rmarkdown
+library(kableExtra)   # make better tables
+library(ggridges)     # make ridgeline plots
+library(dotwhisker)   # make dwplot easily for regression vis
+library(here)         # never rely on local paths again
+library(janitor)      # clean things up easily!
+library(emo)          # use emojis in rmarkdown :-)
+library(scales)       # add scale elements to x and y axes
+
+options(scipen = 999)
+```
+
+
+```{r}
+data("diamonds")
+```
+
+
+## Cut, Color, and Carat 
+
+
+<div class="panel panel-default">
+<div class="panel-heading"> <h2>Cut</h2> </div>
+<div class="panel-body">
+
+```{r}
+diamonds %>% 
+  group_by(cut) %>% 
+  summarise(Min = round(min(price), 0),
+            Q1 = round(quantile(price, 1/4), 0),
+            Median = round(median(price), 0),
+            Mean = round(mean(price), 0),  
+            Q3 = round(quantile(price, 3/4), 0),
+            Max = round(max(price), 0)) %>% 
+  kable(format = "markdown", format.args = list(big.mark = ','), 
+        col.names = c("Group", "Min", "Q1", "Median", "Mean", "Q3", "Max")) %>%
+  kable_styling(full_width = F, position = "left")
+
+```
+
+It looks as though cut is not the only variable that influences price 
+
+</div>
+</div>
+
+
+<div class="panel panel-default">
+<div class="panel-heading"> <h2>Color</h2> </div>
+<div class="panel-body">
+
+```{r}
+diamonds %>% 
+  group_by(color) %>% 
+  summarise(Min = round(min(price), 0),
+            Q1 = round(quantile(price, 1/4), 0),
+            Median = round(median(price), 0),
+            Mean = round(mean(price), 0),  
+            Q3 = round(quantile(price, 3/4), 0),
+            Max = round(max(price), 0)) %>% 
+  kable(format = "markdown", format.args = list(big.mark = ','), 
+        col.names = c("Group", "Min", "Q1", "Median", "Mean", "Q3", "Max")) %>%
+  kable_styling(full_width = F, position = "left")
+
+```
+
+
+It looks as though color D is the cheapest and 
+median and mean price both seem to generally 
+go to up at each letter to color J 
+
+</div>
+</div>
+
+
+<div class="panel panel-default">
+<div class="panel-heading"> <h2>Relationship Between Carat and Price</h2> </div>
+<div class="panel-body">
+
+```{r}
+diamonds %>% 
+  ggplot(aes(carat, price)) +
+  geom_point() +
+  theme_minimal() +
+  labs(x = "Carat", y = "Price")
+```
+
+</div>
+</div>
+
+
+<div class="panel panel-default">
+<div class="panel-heading"> <h2>Relationship Between Carat, Cut, Color, and Price </h2> </div>
+<div class="panel-body">
+```{r}
+diamonds %>% 
+  ggplot(aes(carat, price, color = color)) +
+  geom_point() +
+  facet_wrap(~cut) + 
+  theme_minimal() +
+  labs(x = "Carat", y = "Price")
+```
+
+</div>
+</div>
+
+## Model 
+
+```{r}
+d1 <- 
+  diamonds %>% 
+  mutate(color = factor(color, ordered = FALSE), 
+         cut = factor(cut, ordered = FALSE))
+
+reg1 <- lm(price ~ carat + color + cut, d1)
+options(digits = 2)
+# summary(reg1)
+```
+
+
+<div class="panel panel-default">
+<div class="panel-heading"> <h2>Regression Coefficients </h2> </div>
+<div class="panel-body">
+```{r}
+reg1 <- broom::tidy(reg1)
+
+dotwhisker::dwplot(reg1) +
+  theme_minimal() +
+  theme(legend.position = "none") +
+  geom_vline(xintercept = 0, colour = "grey60", linetype = 3) +
+  scale_x_continuous(labels = dollar)
+```
+
+</div>
+</div>

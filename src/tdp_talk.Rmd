@@ -1,0 +1,267 @@
+---
+title: "Trusting the Process"
+subtitle: "Creating an Efficient and Reproducible Workflow"
+author: "Ludmila Janda, Data Scientist: Amplify" 
+date: Wednesday, April 3rd, 2019
+output: 
+  ioslides_presentation:
+    incremental: true
+    widescreen: true
+    css: style.css
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+
+```{r libraries, echo=FALSE, message=FALSE, warning=FALSE}
+library(tidyverse)    # take all that is good about this universe
+library(PearsonDS)    # simulate normally distributed skewed data
+library(knitr)        # knit your rmarkdown
+library(kableExtra)   # make better tables
+library(ggridges)     # make ridgeline plots
+library(ggalluvial)   # make alluvial plots
+library(here)         # never rely on local paths again
+library(janitor)      # clean things up easily!
+library(emo)          # use emojis in rmarkdown :-)
+
+options(scipen = 999)
+```
+
+
+## Amplify 
+```{r echo=FALSE, out.width='80%'}
+knitr::include_graphics(here::here('images/amplify_sci.png'))
+```
+
+
+## Workflow {.build} 
+
+What is workflow?
+
+- Your personal way of taking data and turning it into product
+- Eg your software, home directory name, and your unpolished work
+
+What is product?
+
+- Your raw data
+- All code that is run to clean and use your raw data 
+
+
+## Why care about your workflow? 
+
+- Collaboration
+- Self-care 
+- Reproducibility
+- Environment switching
+
+
+
+## How? 
+
+- Clear file structure 
+- Software that allows for all your needs 
+(in my case R and RStudio with R Projects, R Markdown, and a connection to 
+a redshift DB)
+
+
+
+## File structure {.build}
+
+```{r echo=FALSE, out.width='75%', fig.align = "center"}
+knitr::include_graphics(here::here('images/file_structure.png'))
+```
+
+-  To maximize reproducibility 
+projects files should be git repositories and 
+structured in a logical, consistent manner
+- Use RStudio git GUI or in the Terminal tab in RStudio
+- <a href='https://rpubs.com/adam_dennett/430188' title=''>Useful git in RStudio resource</a>
+
+
+## File Structure {.build}
+
+File creation shortcut
+```{r, eval=FALSE}
+library(here)
+
+folder_names <- c("src", "input_data", "output_data")  # set folder names
+sapply(folder_names, dir.create)  # generate folders in current directory
+```
+
+Example project folder
+```{r echo=FALSE, out.width='55%', fig.align = "left"}
+knitr::include_graphics(here::here('images/file_layout.png'))
+```
+
+
+
+## Use R projects {.build}
+
+```{r echo=FALSE, out.width='35%', fig.align = "left"}
+knitr::include_graphics(here::here('images/rproj.png'))
+```
+
+```{r echo=FALSE, out.width='55%', fig.align = "left"}
+knitr::include_graphics(here::here('images/lotsarproj.png'))
+```
+
+- Run multiple projects! 
+- Keep all your work contained together in one area
+- Share work and collaborate easily 
+
+
+## Use here::here() {.build}
+
+- DO NOT USE setwd()
+- It won't work for others and it probably 
+won't work for you in a year either 
+- Instead, use the here package 
+
+```{r}
+library(here)
+
+here()
+```
+
+
+```{r, eval=FALSE}
+ul <- read_csv(here::here("data/input/unit_lookup_table.csv"))
+```
+
+
+## Never save workspace {.build}
+
+- All R scripts should be written with the ability to run from a fresh R instance on any computer 
+
+```{r echo=FALSE, out.width='75%', fig.align = "center"}
+knitr::include_graphics(here::here('images/dontsave.png'))
+```
+
+
+## Other tips
+
+- Leave your .Rprofile alone! 
+- Restart R often, re-run code in a fresh setting 
+- This does not mean that your code has to look beautiful and perfect! 
+Just that it can run without being dependent on anything that you set locally
+- But, do follow a code style guide so that it is easy to read 
+- <a href='http://adv-r.had.co.nz/Style.html' title=''>RStudio style guide</a>
+- <a href='https://google.github.io/styleguide/Rguide.xml' title=''>google style guide</a>
+- <a href='https://github.com/r-lib/styler' title=''>Can use styler package to restyle code</a> 
+
+
+## Database Connection
+
+- If you can connect directly to a DB, do it! 
+- Then your source code is the important material, 
+not the CSV sitting somewhere
+- If the query is large, can always write it to 
+a file like .csv, .Rda, .feather, etc
+then read that in for any report 
+
+
+## DB Connection {.build}
+
+- Can use SQL 
+
+```{r, eval=FALSE}
+t1 <- tbl(con, sql(
+  "SELECT 
+	dim_user.user_business_key AS user_business_key,
+  dim_user.school_name AS school_name,
+  TO_CHAR(fact_curriculum_event.request_time, 
+    'YYYY-MM-DD HH24:MI:SS.MS') AS timestamp_date_time,
+	fact_curriculum_event.body_object_id AS event_name
+  FROM events.events_curriculum AS fact_event
+  LEFT JOIN users.dim_user AS dim_user
+  ON fact_curriculum_event.body_actor_account_name =
+      dim_user_v2.user_business_key 
+  WHERE (dim_user.district_name = 'District1')"))
+```
+
+
+## DB Connection {.build}
+
+- Can also use dplyr code with the dbplyr package
+
+```{r, eval=FALSE}
+t2 <- 
+  t1 %>% 
+  filter(school_name == "School One") %>% 
+  collect()
+
+BRRR::skrrrahh(sound = 26)
+
+path <- here::here("data/raw_events.feather")
+write_feather(t1, path)
+```
+
+
+
+## DB Connection {.build}
+
+- Can wrap connection in a function and call the function or make a package
+```{r, eval=FALSE}
+amp_connect <- function(key_name = "datawarehouse") {
+ DBI::dbConnect(odbc::odbc(),
+            Driver   = "driver/path/libamazonredshiftodbc.dylib",
+            Server   = "localhost",
+            Port     = 5439,
+            Database = "dev",
+            UID      = keyring::key_list("datawarehouse")[1,2],
+            PWD      = keyring::key_get("datawarehouse"),
+            bigint   = "integer")
+}
+```
+
+
+## Reports {.build}
+
+- Making reports like RMarkdown look nice, are easy to share
+- Can be knit to doc and shared as a google doc for collaborative
+editing with coworkers that don't code
+- Can be knit to html and hosted to share easily when editing is not needed
+- Use kable and kableExtra, tabset, html, and css to make them extra nice
+
+
+## Parameterized YAML headers {.build}
+```{r echo=FALSE, out.width='75%', fig.align = "center"}
+knitr::include_graphics(here::here('images/yaml_header.png'))
+```
+
+- <a href='https://r4ds.had.co.nz/r-markdown.html#yaml-header' title=''>Parameterized Yaml Headers</a>
+
+## Summary {.build}
+
+- Source is product
+- Don't do anything locally, do it all in your code!
+- Use rprojects, here(), DB connection, git, rmarkdown
+
+```{r echo=FALSE, out.width='30%', fig.align = "left"}
+knitr::include_graphics(here::here('images/ttp_dunk.jpg'))
+```
+
+## Thank you!
+
+- Szu-Min for inviting me 
+- My team at Amplify (Samuel Crane, Harry Gamble, Tashi Lama)
+- Sebastian Teran Hidalgo
+
+
+## Resources 
+
+- <a href='https://www.tidyverse.org/articles/2017/12/workflow-vs-script/' title=''>Workflow blog post from Jenny Bryan</a>
+
+- <a href='https://rpubs.com/adam_dennett/430188' title=''>Useful git in RStudio resource</a>
+
+- <a href='http://adv-r.had.co.nz/Style.html' title=''>RStudio style guide</a>
+
+- <a href='https://google.github.io/styleguide/Rguide.xml' title=''>google style guide</a>
+
+- <a href='https://github.com/r-lib/styler' title=''>Styler package</a>
+
+- <a href='https://www.rstudio.com/resources/videos/best-practices-for-working-with-databases-webinar/' title=''>DB connection webinar</a>
+
+- <a href='https://r4ds.had.co.nz/r-markdown.html#yaml-header' title=''>Parameterized Yaml Headers</a>
